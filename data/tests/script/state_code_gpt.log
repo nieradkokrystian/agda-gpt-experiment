@@ -2,6 +2,10 @@
  ############## Attempt number:  1  ##############
 
 
-not : Bool → Bool
-not true = false
-not false = true
+data Nat : Set where
+  zero : Nat
+  suc  : Nat → Nat
+
+length : {A : Set} → List A → Nat
+length nil = zero
+length (cons _ xs) = suc (length xs)
