@@ -1,0 +1,16 @@
+While helping me, you need to output only code that should be appended to my code, do not repat my code  to me.
+
+
+Hi GPT, I tried implementing the function using the code you provided, but I encountered some errors during compilation. 
+
+The compiler reported the following errors:
+
+{compiler_errors}
+
+I need you to output ONLY code that I will append to my initial code, DO NOT print whole surce. This is really important.
+
+Do not duplicate my code, always print only the code that I need to add at the end of code that i showed you at the begining of conversation, this is really important to me.
+
+
+
+Thanks!
