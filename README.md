@@ -1,8 +1,8 @@
 # agda-gpt-assistant
 
-Before start, you have to prepare directory with templates. Directory is
-available in git repositry * /data/templates *  Copy this dir in your currnet
-executing dir, or * ~/.agda-gpt-experiment * witch one you need to create first.
+Before you start, you have to prepare the directory with templates. Directory is
+available in git repository `/data/templates`. Copy this directory to your current
+executing dir, or `~/.agda-gpt-experiment` whichever one you need to create first.
 
 Example: aga -a=Test.agda -t=not : Bool → Bool -c=myConfig.json -m=Pretty -l=15
 
