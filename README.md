@@ -1,14 +1,18 @@
 # agda-gpt-assistant
 
-Before start, you have to prepare directory with templates. Directory is
-available in git repositry * /data/templates *  Copy this dir in your currnet
-executing dir, or * ~/.agda-gpt-experiment * witch one you need to create first.
+Before you start, you have to prepare the directory with templates. Directory is
+available in git repository `/data/templates`. Copy this directory to your current
+executing dir, or `~/.agda-gpt-experiment` whichever one you need to create first.
 
-Example: aga -a=Test.agda -t=not : Bool → Bool -c=myConfig.json -m=Pretty -l=15
-
+Example: 
+```
+aga -a=Test.agda -t=not : Bool → Bool -c=myConfig.json -m=Pretty -l=15
+```
+```
 aga [OPTIONS]
-
+```
 Common flags:
+```
   -a --agda=FILE       This flag has no default value. Enter the file name of
                        agda or the entire filepath, eg. Foo.agda
   -t --task=SIGNATURE  This flag has no default value. Enter the function
@@ -24,6 +28,7 @@ Common flags:
                        value of 5.
   -? --help            Display help message
   -V --version         Print version information
+```
 
 More details on the website https://codecredence.ai
 
