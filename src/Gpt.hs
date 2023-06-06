@@ -7,15 +7,15 @@
 
 module Gpt where
 
-import Types 
+import Types
 import Extra
 
 
-import Control.Monad.Trans.RWS 
+import Control.Monad.Trans.RWS
 import Control.Monad.IO.Class (liftIO)
 
 import Data.Maybe
-import Data.Aeson as A 
+import Data.Aeson as A
 import qualified Data.List as L
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as BL
