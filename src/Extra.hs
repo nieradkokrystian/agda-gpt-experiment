@@ -11,6 +11,8 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 
 import Control.Monad.Trans.RWS 
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Reader as MR
+
 import Data.Maybe
 
 import  Types
@@ -118,6 +120,47 @@ trimPrompt ml =
   else
     let (p1:p2:x)= ml in
       p1 : p2 : (L.drop (l - 10) ml)
-    
-    
 
+
+-- data ProblemsInput = OneProblem | Dir | ListofProblem deriving (Show)
+
+
+buildProblemList :: PLMonad [LoProblems]
+buildProblemList = do
+  fromReader <- MR.ask
+  let dirP = snd fromReader
+      inputP = input (fst fromReader)
+      sourceP = source (fst fromReader)
+  case inputP of
+    "problem" -> do
+      problem <-  liftIO $ createProblem (dirP++sourceP)
+      return problem
+    "dir" -> return []
+    "list" -> return []
+    _ -> liftIO $ die "\n\nType  proper input value \n"
+  return []
+
+
+createProblem :: String -> IO [LoProblems]
+createProblem filePath = do
+  agda <- check_agda filePath
+  return []
+
+splitProblem :: String -> (String, String)
+splitProblem file = undefined
+
+findMeta :: String -> FilePath
+findMeta file = undefined
+
+  
+
+
+-- data Aga = Aga { input :: String
+--                , source :: String
+--                , conF :: String
+--                , mode :: String
+--                , maxT :: Int
+--                } deriving (Show, Data, Typeable)
+
+
+-- type PLMonad = ReaderT (Aga, String) IO

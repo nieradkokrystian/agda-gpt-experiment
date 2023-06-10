@@ -1,0 +1,8 @@
+{
+  "agdaVersion": "1.2.3",
+  "dependencies": [
+    "dependency1",
+    "dependency2",
+    "dependency3"
+  ]
+}
