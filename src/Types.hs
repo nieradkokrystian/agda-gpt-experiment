@@ -152,10 +152,10 @@ data ConvPart = ConvPart
                   , promptL :: [Message]
                   } deriving (Show)
 
-data LoProblems = LoProblems { agdaP :: String
-                             , taskP :: String
-                             , metaP :: String
-                             } deriving (Show)
+data Problem = Problem { agdaP :: String
+                       , taskP :: String
+                       , metaP :: String
+                       } deriving (Show)
 
 
 type AGMonad  = RWST AGEnv () [ConvPart] IO

@@ -34,15 +34,13 @@ import Data.Time.Format
 
 import System.Console.ANSI
 
-
-import Data.List.Split 
-
+import qualified Data.String as S 
 
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Data.Text as T
 import System.Exit
-import System.FilePath (splitFileName)
+import System.FilePath (splitFileName, replaceExtension,  takeDirectory)
 
 import Control.Concurrent
 
@@ -125,7 +123,7 @@ trimPrompt ml =
 -- data ProblemsInput = OneProblem | Dir | ListofProblem deriving (Show)
 
 
-buildProblemList :: PLMonad [LoProblems]
+buildProblemList :: PLMonad [Problem]
 buildProblemList = do
   fromReader <- MR.ask
   let dirP = snd fromReader
@@ -133,7 +131,7 @@ buildProblemList = do
       sourceP = source (fst fromReader)
   case inputP of
     "problem" -> do
-      problem <-  liftIO $ createProblem (dirP++sourceP)
+      problem <-  liftIO $ extractProblem (dirP++sourceP)
       return problem
     "dir" -> return []
     "list" -> return []
@@ -141,19 +139,36 @@ buildProblemList = do
   return []
 
 
-createProblem :: String -> IO [LoProblems]
-createProblem filePath = do
-  agda <- check_agda filePath
-  return []
+extractProblem :: String -> IO [Problem]
+extractProblem fp = do
+  let (path, file) =  splitFileName fp
+  pFile <- check_agda fp
+  readedAFile <- liftIO $ readFile pFile
+  let (agda, task) = splitProblem readedAFile
+  meta <- findMetaD fp
+  return [Problem agda task meta]
 
 splitProblem :: String -> (String, String)
-splitProblem file = undefined
+splitProblem file =
+  let list@(x:z:r) =( L.reverse . S.lines) file in
+  (z,S.unlines r)
 
-findMeta :: String -> FilePath
-findMeta file = undefined
+findMetaD :: String -> IO FilePath
+findMetaD fp = do
+  let (path, file) =  splitFileName fp
+  e <- doesFileExist $ replaceExtension fp "json"
+  case e of
+    True -> return fp
+    False -> findMetaF path
 
-  
-
+findMetaF :: FilePath -> IO FilePath
+findMetaF path = do
+  let filePath = path ++ "Meta.json"
+  m <- doesFileExist $ filePath
+  case m of
+    True -> return filePath
+    False -> findMetaF $ ( takeDirectory .  takeDirectory) path
+  -- replaceExtension
 
 -- data Aga = Aga { input :: String
 --                , source :: String
