@@ -40,7 +40,7 @@ import Network.HTTP.Client
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Data.Text as T
 import System.Exit
-import System.FilePath (splitFileName, replaceExtension,  takeDirectory)
+import System.FilePath 
 
 import Control.Concurrent
 
@@ -133,8 +133,9 @@ buildProblemList = do
     "problem" -> do
       problem <-  liftIO $ extractProblem dirP sourceP
       return [problem]
-    "dir" -> do
-      liftIO rr
+    "dir" -> do 
+      problems <- liftIO $ dirInspection  (dirP ++ sourceP ++ "/") []
+      liftIO $ putStrLn $ show problems
       return []
     "list" -> do
       l <- liftIO $ decodeList sourceP
@@ -148,12 +149,26 @@ buildProblemList = do
   return []
 
 
+type  LString = [String]
 
+dirInspection :: String ->  LString ->IO [String]
+dirInspection dir list= do
+  c <-listDirectory $ dir
+  let fList = L.foldl funcA list c
+  dList <- L.foldl (funcB dir) [] c
+  return fList
+  where
+    funcA acc l = case  takeExtension (dir++l) of
+      ".agda" ->  (dir++l) : (acc :: [String])
+      _ -> acc
 
-rr :: IO ()
-rr = do
-  c <-listDirectory "/home/kryn/ww"
-  putStrLn $ show c
+-- TODO 
+funcB :: String -> LString -> String -> IO LString
+funcB prefix acc l = do
+  ex <- doesDirectoryExist l 
+  case ex  of
+       True -> return $ l : (acc :: [String])
+       _ -> return $ acc
 
 
 decodeList :: String -> IO [String]
