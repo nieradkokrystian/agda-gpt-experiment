@@ -162,8 +162,6 @@ type AGMonad  = RWST AGEnv () [ConvPart] IO
 
 type PLMonad = ReaderT (Aga, String) IO
 
-
-
 readArgs :: Aga
 readArgs =
   Aga{ input = def &= help "This flag defines the problems located in the agda-problem-repository for AGA to solve. It can have one of three values. It can point to a single problem - * problem *, the entire directory of problems including subdirectories and their contents - * dir *, or a list of selected problems from the repository placed in a .json file - * list *. This flag does not have a default value."

@@ -32,9 +32,13 @@ import Control.Concurrent
 
 import System.IO
 
+-- main :: IO ()
+-- main = do
+--   loadConfigAndRun  mainAG
+
 main :: IO ()
 main = do
-  loadConfigAndRun  mainAG
+  lcR mainAG
 
 
 lcR :: (AGEnv  -> IO ()) -> IO ()
@@ -50,6 +54,7 @@ lcR  mainAG = do
      putStrLn "--"
      die "Something went wrong, try one more time"
     Just c -> do
+      putStrLn "tu jestem"
       problemlist <- runReaderT buildProblemList (args, (problemsDir c))
       return ()
 

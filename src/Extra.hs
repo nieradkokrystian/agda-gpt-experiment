@@ -131,32 +131,60 @@ buildProblemList = do
       sourceP = source (fst fromReader)
   case inputP of
     "problem" -> do
-      problem <-  liftIO $ extractProblem (dirP++sourceP)
-      return problem
-    "dir" -> return []
-    "list" -> return []
-    _ -> liftIO $ die "\n\nType  proper input value \n"
+      problem <-  liftIO $ extractProblem dirP sourceP
+      return [problem]
+    "dir" -> do
+      liftIO rr
+      return []
+    "list" -> do
+      l <- liftIO $ decodeList sourceP
+      x <- liftIO $ mapM (extractProblem dirP) l
+      liftIO $ putStrLn $ show x
+      return x
+    _ ->  do liftIO $ do
+                        cPrint ("Type proper input value\n") Red
+                        putStrLn "--"
+                        die "Something went wrong, try one more time"
   return []
 
 
-extractProblem :: String -> IO [Problem]
-extractProblem fp = do
-  let (path, file) =  splitFileName fp
+
+
+rr :: IO ()
+rr = do
+  c <-listDirectory "/home/kryn/ww"
+  putStrLn $ show c
+
+
+decodeList :: String -> IO [String]
+decodeList name  =  do
+  pwd <- getEnv "PWD"
+  ls <- (A.decodeFileStrict (pwd ++ "/" ++ name)) :: IO ( Maybe [String])
+  case ls of
+    Nothing -> do
+               cPrint ("Incorect problem list ") Red
+               putStrLn "--"
+               die "Something went wrong, try one more time"
+    Just list -> return list
+
+
+
+extractProblem :: String -> String -> IO Problem
+extractProblem dir file = do
+  let fp = dir ++ file
   pFile <- check_agda fp
   readedAFile <- liftIO $ readFile pFile
-  let (agda, task) = splitProblem readedAFile
+  let (task, agda) = splitProblem readedAFile
   meta <- findMetaD fp
-  return [Problem agda task meta]
+  return $ Problem agda task meta
 
-splitProblem :: String -> (String, String)
-splitProblem file =
-  let list@(x:z:r) =( L.reverse . S.lines) file in
-  (z,S.unlines r)
+
 
 findMetaD :: String -> IO FilePath
 findMetaD fp = do
   let (path, file) =  splitFileName fp
   e <- doesFileExist $ replaceExtension fp "json"
+  -- putStrLn $ show e
   case e of
     True -> return fp
     False -> findMetaF path
@@ -164,18 +192,15 @@ findMetaD fp = do
 findMetaF :: FilePath -> IO FilePath
 findMetaF path = do
   let filePath = path ++ "Meta.json"
+  -- putStrLn $ show filePath
   m <- doesFileExist $ filePath
   case m of
     True -> return filePath
-    False -> findMetaF $ ( takeDirectory .  takeDirectory) path
-  -- replaceExtension
-
--- data Aga = Aga { input :: String
---                , source :: String
---                , conF :: String
---                , mode :: String
---                , maxT :: Int
---                } deriving (Show, Data, Typeable)
+    False -> do
+      findMetaF  $ (( takeDirectory .  takeDirectory) path) ++ "/"
 
 
--- type PLMonad = ReaderT (Aga, String) IO
+splitProblem :: String -> (String, String)
+splitProblem file =
+  let list@(x:z:r) =( L.reverse . S.lines) file in
+  (z,((S.unlines . L.reverse) r))
