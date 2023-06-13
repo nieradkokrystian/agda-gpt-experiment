@@ -29,6 +29,7 @@ import Control.Monad.Trans.RWS
 import Control.Monad.Reader
 
 import Control.Concurrent
+import System.Environment
 
 import System.IO
 
@@ -43,20 +44,52 @@ main = do
 
 lcR :: (AGEnv  -> IO ()) -> IO ()
 lcR  mainAG = do
+  pwd  <- getEnv "PWD"
   args <- cmdArgs readArgs
   fPGpt <- check_promt "f"
   rPGpt <- check_promt "r"
   conf <- check_config (conF args)
   config  <- (A.decodeFileStrict conf) :: IO (Maybe FromConfig)
+  let m = case  mode args of
+                      "Pretty" -> PrettyMode
+                      _        -> DebugMode
   case config of
     Nothing -> do
      cPrint  ("\nConfig file seems to be incorrect check it:  \n" ++ conf)  Red
      putStrLn "--"
      die "Something went wrong, try one more time"
     Just c -> do
-      putStrLn "tu jestem"
       problemlist <- runReaderT buildProblemList (args, (problemsDir c))
-      return ()
+      writeFile (pwd++"/aga-log.txt") ( "Aga has  " ++ (show (length problemlist)))
+      let mainDir = pwd ++ "/aga-exec"
+      createDirectory $ mainDir
+      mapM_ (cAGE mainDir) problemlist
+      where 
+         cAGE dir problem = do
+           let dirN = dir  ++ (nameP problem)
+               newAF = "AGA-"++ "problem"
+           putStrLn $show $  nameP problem     
+           putStrLn dirN
+           writeFile (dirN++"/Problem.agda") (agdaP problem)
+
+           let  env = AGEnv
+                 { apiKey = gptApiKey c
+                 , orgAgdaF = dirN ++ "/Problem.agda"
+                 , dirName = dirN
+                 , agdaFile = newAF
+                 , taskDescription = taskP problem
+                 , operationMode = m
+                 , maxTurns = maxT args
+                 , fGptTemp = fPGpt
+                 , rGptTemp = rPGpt
+                 , gptModel =  gpt_model c
+                 , tc_url = typeCheckerURL c
+                 , tc_key = typeCheckerKEY c
+                 }
+           mainAG env
+
+
+
 
 loadConfigAndRun :: (AGEnv  -> IO ()) -> IO ()
 loadConfigAndRun mainAG = do

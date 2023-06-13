@@ -155,6 +155,7 @@ data ConvPart = ConvPart
 data Problem = Problem { agdaP :: String
                        , taskP :: String
                        , metaP :: String
+                       , nameP :: String
                        } deriving (Show)
 
 

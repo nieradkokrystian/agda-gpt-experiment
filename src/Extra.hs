@@ -12,6 +12,7 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Trans.RWS 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader as MR
+import Control.Monad as MM
 
 import Data.Maybe
 
@@ -131,22 +132,23 @@ buildProblemList = do
       sourceP = source (fst fromReader)
   case inputP of
     "problem" -> do
-      problem <-  liftIO $ extractProblem dirP sourceP
+      problem <-  liftIO $ extractProblem (dirP ++ sourceP)
+      liftIO $ putStrLn $ show problem
       return [problem]
-    "dir" -> do 
-      problems <- liftIO $ dirInspection  (dirP ++ sourceP ++ "/") []
-      liftIO $ putStrLn $ show problems
-      return []
+    "dir" -> do
+      problemsAL <- liftIO $ dirInspection  (dirP  ++ sourceP ++ "/") []
+      problems <- liftIO $ mapM  extractProblem problemsAL
+      -- liftIO $ mapM (\x -> putStrLn (show x)) ( L.reverse problems) 
+      return problems
     "list" -> do
       l <- liftIO $ decodeList sourceP
-      x <- liftIO $ mapM (extractProblem dirP) l
-      liftIO $ putStrLn $ show x
+      let newl  = fmap (\x -> dirP ++ x) l
+      x <- liftIO $ mapM extractProblem newl
       return x
     _ ->  do liftIO $ do
                         cPrint ("Type proper input value\n") Red
                         putStrLn "--"
                         die "Something went wrong, try one more time"
-  return []
 
 
 type  LString = [String]
@@ -154,22 +156,27 @@ type  LString = [String]
 dirInspection :: String ->  LString ->IO [String]
 dirInspection dir list= do
   c <-listDirectory $ dir
-  let fList = L.foldl funcA list c
-  dList <- L.foldl (funcB dir) [] c
-  return fList
+  let newDir = fmap (\x -> dir ++ x) $ L.sort c
+  let flist = L.foldl funcA list newDir
+  dlist <-funcB  newDir (list)
+  return $ dlist ++ flist 
   where
-    funcA acc l = case  takeExtension (dir++l) of
-      ".agda" ->  (dir++l) : (acc :: [String])
+
+    funcA acc l = case  takeExtension l of
+      ".agda" -> l : (acc :: [String])
       _ -> acc
 
--- TODO 
-funcB :: String -> LString -> String -> IO LString
-funcB prefix acc l = do
-  ex <- doesDirectoryExist l 
-  case ex  of
-       True -> return $ l : (acc :: [String])
-       _ -> return $ acc
+funcB :: LString -> LString -> IO LString
+funcB dirs lstring = do
 
+  neL <-  MM.foldM funcC lstring dirs
+  return neL
+  where
+    funcC acc ll = do
+      ex <- doesDirectoryExist ll
+      case ex of
+        True -> dirInspection (ll++ "/") acc
+        False -> return acc
 
 decodeList :: String -> IO [String]
 decodeList name  =  do
@@ -184,14 +191,14 @@ decodeList name  =  do
 
 
 
-extractProblem :: String -> String -> IO Problem
-extractProblem dir file = do
-  let fp = dir ++ file
+extractProblem :: String -> IO Problem
+extractProblem fp = do
+  -- let fp = dir ++ file
   pFile <- check_agda fp
   readedAFile <- liftIO $ readFile pFile
   let (task, agda) = splitProblem readedAFile
   meta <- findMetaD fp
-  return $ Problem agda task meta
+  return $ Problem agda task meta fp
 
 
 
