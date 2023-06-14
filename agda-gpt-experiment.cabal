@@ -35,7 +35,8 @@ library
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
-      aeson
+      MissingH
+    , aeson
     , ansi-terminal
     , base >=4.7 && <5
     , bytestring
@@ -64,7 +65,8 @@ executable aga
       app
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      aeson
+      MissingH
+    , aeson
     , agda-gpt-experiment
     , ansi-terminal
     , base >=4.7 && <5
@@ -95,7 +97,8 @@ test-suite agda-gpt-experiment-test
       test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      aeson
+      MissingH
+    , aeson
     , agda-gpt-experiment
     , ansi-terminal
     , base >=4.7 && <5

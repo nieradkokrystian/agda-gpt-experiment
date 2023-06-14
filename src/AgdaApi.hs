@@ -37,21 +37,20 @@ import Control.Concurrent
 
 
 
-tryToCompileAPI :: String -> String -> IO (Maybe String)
-tryToCompileAPI fp url = do
+tryToCompileAPI :: String -> String -> String -> IO (Maybe String)
+tryToCompileAPI agda meta  url = do
   manager <- newManager defaultManagerSettings
   initialRequest <- parseRequest url
   let request = initialRequest { method = "POST"}
                                -- , requestHeaders = [ ("Content-Type", "multipart/form-data")]}
-      partList = [ partFile "Problem.agda" "/home/kryn/.agda-gpt-experiment/Problem.agda"
-                 , partFile "Problem.json" "/home/kryn/.agda-gpt-experiment/Problem.json"
+      partList = [ partFile "Problem.agda" agda
+                 , partFile "Problem.json" meta
                  ] 
   req <- formDataBody partList request 
   response <- httpLbs req manager
   res <- dec $ responseBody response
 
   return Nothing
-  
 
 
 dec :: BL.ByteString -> IO (Maybe String)
@@ -61,76 +60,3 @@ dec re = do
     Nothing -> return Nothing
     Just x -> return $ Just (output x)
 
--- ResponseApi
-
-
--- tryToCompile :: String -> IO (Maybe String)
--- tryToCompile fp = do
---   let (path, file) =  splitFileName fp
---   aReq <- runProcess_ path file
---   p  <- getEnv "PWD"
---   case aReq of
---     Nothing -> return Nothing
---     Just re -> do
---                 return $ Just $ replaceStringLoop (p++"/") "" re
-      
--- runProcess_ ::  FilePath -> String -> IO (Maybe String)
--- runProcess_ pwd afile = do
---   let cp = shell $ "agda" ++ " " ++ afile
---       ncp = cp { cwd = Just pwd
---                , std_out = CreatePipe
---                , std_err = CreatePipe
---                }            
---   (code, output, errorOutput) <- readCreateProcessWithExitCode ncp ""
---   let result = case code of
---                   ExitSuccess   -> Nothing
---                   ExitFailure _ -> Just output
---   return result
-
-
-
-
-
--- createGptRequest :: String -> [Message] -> String -> Request
--- createGptRequest model prompt key = request
---   where
---     apiKey_ = B.pack key 
---     baseRequest = parseRequest_ "https://api.openai.com/v1/chat/completions"
---     request = baseRequest
---       { method = "POST"
---       , requestHeaders = [ ("Content-Type", "application/json")
---                          , ("Authorization", B.concat ["Bearer ", apiKey_])
---                          ]
---       , requestBody = RequestBodyLBS (genJsonReq model prompt)
---       }
-
-
-
--- gptConv ::  String -> [Message] -> String -> OperationMode -> IO (String, String)
--- gptConv model prompt key oM= do
---   let rprompt = L.reverse (trimPrompt prompt) 
---   manager <- newManager tlsManagerSettings
---   let reqb = createGptRequest model rprompt key
---   request <- return (createGptRequest model rprompt key)
---   response <- httpLbs reqb manager
---   let code = (statusCode $ responseStatus response)
---   case code of
---     200 -> do
---       case oM of
---         PrettyMode -> do
---           -- putStrLn $ show (length prompt)
---           -- mapM (\x -> putStrLn ((show x)++ "\n\n")) prompt
---           return ()
---         DebugMode -> do
---           setSGR [(SetColor Foreground Dull Yellow)]
---           putStrLn $ "\n\n\n" ++ show reqb ++ "\n\n\n\n\n"
---           putStrLn $ show $ genJsonReq model rprompt      
---           putStrLn $ show $  response
---           setSGR [Reset]
---       return $  (plainCode  (decodeRes $ responseBody response),
---                 ( decodeRes $ responseBody response))
---     _ -> do
---       cPrint ("CODE: " ++ (show code) ++ "\n\n")  Red
---       cPrint ( show response ) Red
---       putStrLn "--"
---       die "Something went wrong, try one more time" 

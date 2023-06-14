@@ -52,15 +52,6 @@ cPrint s c = do
   setSGR [Reset]
 
 
--- cPrint :: String -> Color -> IO ()
--- cPrint s c = do
---   setSGR [(SetColor Foreground Dull c )]
---   clearScreen
---   threadDelay 7000000 -- microSec
---   setCursorPosition 0 0 
---   putStrLn s
---   setSGR [Reset]
-
 
 check_promt :: String ->  IO String
 check_promt s = do
@@ -121,8 +112,6 @@ trimPrompt ml =
       p1 : p2 : (L.drop (l - 10) ml)
 
 
--- data ProblemsInput = OneProblem | Dir | ListofProblem deriving (Show)
-
 
 buildProblemList :: PLMonad [Problem]
 buildProblemList = do
@@ -133,12 +122,10 @@ buildProblemList = do
   case inputP of
     "problem" -> do
       problem <-  liftIO $ extractProblem (dirP ++ sourceP)
-      liftIO $ putStrLn $ show problem
       return [problem]
     "dir" -> do
       problemsAL <- liftIO $ dirInspection  (dirP  ++ sourceP ++ "/") []
       problems <- liftIO $ mapM  extractProblem problemsAL
-      -- liftIO $ mapM (\x -> putStrLn (show x)) ( L.reverse problems) 
       return problems
     "list" -> do
       l <- liftIO $ decodeList sourceP
@@ -159,7 +146,7 @@ dirInspection dir list= do
   let newDir = fmap (\x -> dir ++ x) $ L.sort c
   let flist = L.foldl funcA list newDir
   dlist <-funcB  newDir (list)
-  return $ dlist ++ flist 
+  return $ dlist ++ flist
   where
 
     funcA acc l = case  takeExtension l of
@@ -193,7 +180,6 @@ decodeList name  =  do
 
 extractProblem :: String -> IO Problem
 extractProblem fp = do
-  -- let fp = dir ++ file
   pFile <- check_agda fp
   readedAFile <- liftIO $ readFile pFile
   let (task, agda) = splitProblem readedAFile
@@ -206,7 +192,6 @@ findMetaD :: String -> IO FilePath
 findMetaD fp = do
   let (path, file) =  splitFileName fp
   e <- doesFileExist $ replaceExtension fp "json"
-  -- putStrLn $ show e
   case e of
     True -> return fp
     False -> findMetaF path
@@ -214,7 +199,6 @@ findMetaD fp = do
 findMetaF :: FilePath -> IO FilePath
 findMetaF path = do
   let filePath = path ++ "Meta.json"
-  -- putStrLn $ show filePath
   m <- doesFileExist $ filePath
   case m of
     True -> return filePath
@@ -226,3 +210,5 @@ splitProblem :: String -> (String, String)
 splitProblem file =
   let list@(x:z:r) =( L.reverse . S.lines) file in
   (z,((S.unlines . L.reverse) r))
+
+

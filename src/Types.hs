@@ -96,7 +96,7 @@ data AGEnv = AGEnv
     , gptModel :: String
     , tc_url :: String
     , tc_key :: String
-    , prob_dir :: FilePath
+    , meta_l :: FilePath
     } deriving (Show)
 
 data Aga = Aga { input :: String

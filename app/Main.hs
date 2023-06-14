@@ -15,7 +15,9 @@ import qualified Gpt as G
 import Extra
 import AgdaApi
 
+import Data.List.Utils
 
+import Data.List
 import System.Console.CmdArgs
 import System.Environment (getArgs)
 import System.Process
@@ -33,17 +35,13 @@ import System.Environment
 
 import System.IO
 
--- main :: IO ()
--- main = do
---   loadConfigAndRun  mainAG
-
 main :: IO ()
 main = do
-  lcR mainAG
+  loadConfigAndR mainAG
 
 
-lcR :: (AGEnv  -> IO ()) -> IO ()
-lcR  mainAG = do
+loadConfigAndR :: (AGEnv  -> IO ()) -> IO ()
+loadConfigAndR  mainAG = do
   pwd  <- getEnv "PWD"
   args <- cmdArgs readArgs
   fPGpt <- check_promt "f"
@@ -64,19 +62,26 @@ lcR  mainAG = do
       let mainDir = pwd ++ "/aga-exec"
       createDirectory $ mainDir
       mapM_ (cAGE mainDir) problemlist
-      where 
+      where
          cAGE dir problem = do
-           let dirN = dir  ++ (nameP problem)
-               newAF = "AGA-"++ "problem"
-           putStrLn $show $  nameP problem     
-           putStrLn dirN
+           setCurrentDirectory dir
+           let name = case stripPrefix (problemsDir c ++ "Problems/") (nameP problem) of
+                 Nothing -> "unknow_dir"
+                 Just x -> x
+               nameOfProblemDir = replace "/" "-" (take (length name - 5 )name)
+               dirN = dir ++ "/"  ++ nameOfProblemDir
+               newAF = "AGA-" ++ "Problem.agda"
+           createDirectory dirN
+           setCurrentDirectory dirN
            writeFile (dirN++"/Problem.agda") (agdaP problem)
+           copyFile (metaP problem) (dirN++"/Problem.json")
+           copyFile "Problem.agda" "Org-Problem.agda"
 
            let  env = AGEnv
                  { apiKey = gptApiKey c
-                 , orgAgdaF = dirN ++ "/Problem.agda"
+                 , orgAgdaF = dirN ++ "/Org-Problem.agda"
                  , dirName = dirN
-                 , agdaFile = newAF
+                 , agdaFile = dirN ++ "/Problem.agda"
                  , taskDescription = taskP problem
                  , operationMode = m
                  , maxTurns = maxT args
@@ -85,66 +90,21 @@ lcR  mainAG = do
                  , gptModel =  gpt_model c
                  , tc_url = typeCheckerURL c
                  , tc_key = typeCheckerKEY c
+                 , meta_l = (dirN ++ "/Problem.json")
                  }
            mainAG env
 
 
 
 
-loadConfigAndRun :: (AGEnv  -> IO ()) -> IO ()
-loadConfigAndRun mainAG = do
-  args <- cmdArgs readArgs
-  fPGpt <- check_promt "f"
-  rPGpt <- check_promt "r"
-  agda <- check_agda "fr"
-  conf <- check_config (conF args)
-  config  <- (A.decodeFileStrict conf) :: IO (Maybe FromConfig)
-  ts <- timestamp
-  let md = mode args
-  case config of
-    Nothing -> do
-     cPrint  ("\nConfig file seems to be incorrect check it:  \n" ++ conf)  Red
-     putStrLn "--"
-     die "Something went wrong, try one more time"
-    Just c ->
-             let
-             (path, file) =  splitFileName agda
-             newAF = "AGA-"++ file
-             pureF = take (length file - 5 )file
-             dirN = pureF ++"_"++ts
-             m = case md of
-                      "Pretty" -> PrettyMode
-                      _        -> DebugMode
-
-
-             env = AGEnv
-               { apiKey = gptApiKey c
-               , orgAgdaF = agda
-               , dirName = dirN
-               , agdaFile = newAF
-               , taskDescription = "to change"
-               , operationMode = m
-               , maxTurns = maxT args
-               , fGptTemp = fPGpt
-               , rGptTemp = rPGpt
-               , gptModel =  gpt_model c
-               , tc_url = typeCheckerURL c
-               , tc_key = typeCheckerKEY c
-               }
-            in mainAG env
-
-
 mainAG :: AGEnv -> IO ()
 mainAG env = do
-  checkAgdaF <- G.tryToCompile $  (orgAgdaF env) 
+  checkAgdaF <- tryToCompileAPI   (agdaFile env) (meta_l env) (tc_url env)
   case checkAgdaF of
     Just x -> do
-       cPrint  ("Incorrect  agda File:  " ++ (orgAgdaF env) ++ "\n\n" ++ "COMPILER ERROR: " ++ x ) Red 
+       cPrint  ("Incorrect  agda File:  " ++ (orgAgdaF env) ++ "\n\n" ++ "COMPILER ERROR: " ++ x ) Red
     Nothing -> do
                initInfo env
-               threadDelay 1500000
-               copyFile (orgAgdaF env) ((agdaFile env))
-               createDirectory (dirName env)
                conversation env []
 
 
