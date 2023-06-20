@@ -83,6 +83,7 @@ loadConfigAndR  mainAG = do
                  , dirName = dirN
                  , agdaFile = dirN ++ "/Problem.agda"
                  , taskDescription = taskP problem
+                 , fullTask = fulltP problem
                  , operationMode = m
                  , maxTurns = maxT args
                  , fGptTemp = fPGpt
@@ -124,10 +125,11 @@ conversation env cP = do
       setSGR [(SetColor Foreground Dull Green)]
       clearScreen
       setCursorPosition 0 0
-      putStrLn $ "Compilation succeeded in " ++ (show l) ++ " attempts. Check new "++ (agdaFile env) ++ " file\n\n" ++
-        "Here is the code you need to add to your existing code:\n" ++
-        (gpt_res (head state)) ++ "\n\nHere is the complite agda file code: \n\n" ++
-        (current_agad_file (head state))
+      putStrLn $ "Compilation succeeded in " ++ (show l) ++ " attempts."
+
+      setSGR [Reset]
+      putStrLn $ (gpt_res (head state))
+      threadDelay 2000000
       setSGR [Reset]
 
 initInfo :: AGEnv ->  IO ()

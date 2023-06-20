@@ -121,7 +121,7 @@ buildProblemList = do
       sourceP = source (fst fromReader)
   case inputP of
     "problem" -> do
-      problem <-  liftIO $ extractProblem (dirP ++ sourceP)
+      problem <-  liftIO $ extractProblem (dirP ++ sourceP ++ ".agda")
       return [problem]
     "dir" -> do
       problemsAL <- liftIO $ dirInspection  (dirP  ++ sourceP ++ "/") []
@@ -182,9 +182,9 @@ extractProblem :: String -> IO Problem
 extractProblem fp = do
   pFile <- check_agda fp
   readedAFile <- liftIO $ readFile pFile
-  let (task, agda) = splitProblem readedAFile
+  let (task, agda, full) = splitProblem readedAFile
   meta <- findMetaD fp
-  return $ Problem agda task meta fp
+  return $ Problem agda task meta fp full
 
 
 
@@ -206,9 +206,9 @@ findMetaF path = do
       findMetaF  $ (( takeDirectory .  takeDirectory) path) ++ "/"
 
 
-splitProblem :: String -> (String, String)
+splitProblem :: String -> (String, String, String)
 splitProblem file =
   let list@(x:z:r) =( L.reverse . S.lines) file in
-  (z,((S.unlines . L.reverse) r))
+  (z,((S.unlines . L.reverse) r), (z ++ "\n" ++ x))
 
 

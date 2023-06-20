@@ -89,6 +89,7 @@ data AGEnv = AGEnv
     , dirName :: String
     , agdaFile :: FilePath
     , taskDescription :: String
+    , fullTask :: String
     , operationMode :: OperationMode
     , maxTurns :: Int
     , fGptTemp :: FilePath
@@ -156,6 +157,7 @@ data Problem = Problem { agdaP :: String
                        , taskP :: String
                        , metaP :: String
                        , nameP :: String
+                       , fulltP :: String
                        } deriving (Show)
 
 

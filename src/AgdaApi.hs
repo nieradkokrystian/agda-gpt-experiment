@@ -45,12 +45,16 @@ tryToCompileAPI agda meta  url = do
                                -- , requestHeaders = [ ("Content-Type", "multipart/form-data")]}
       partList = [ partFile "Problem.agda" agda
                  , partFile "Problem.json" meta
-                 ] 
-  req <- formDataBody partList request 
+                 ]
+  req <- formDataBody partList request
   response <- httpLbs req manager
-  res <- dec $ responseBody response
-
-  return Nothing
+  res  <- dec $ responseBody response
+  -- let x = status res
+  -- putStrLn  $ ( (output res))
+  return res
+  -- case (status res) of
+  --   0 -> Nothing
+  --   _ -> (Just (output res))
 
 
 dec :: BL.ByteString -> IO (Maybe String)
@@ -58,5 +62,8 @@ dec re = do
   let r = A.decode re :: Maybe ResponseApi
   case r of
     Nothing -> return Nothing
-    Just x -> return $ Just (output x)
+    Just x -> do
+      case status x of
+        0 -> return Nothing
+        _ -> return $ Just (output x)
 
