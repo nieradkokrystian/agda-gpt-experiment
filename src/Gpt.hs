@@ -86,9 +86,11 @@ gptConv model prompt key oM= do
     _ -> do
       cPrint ("CODE: " ++ (show code) ++ "\n\n")  Red
       cPrint ( show response ) Red
-      putStrLn "--"
-      die "Something went wrong, try one more time"
+      -- putStrLn "--"
+      -- "Something went wrong, try one more time"
+      return ("EMPTY!!!","EMPTY!!!")
 
+      
 plainCode :: String ->  String
 plainCode res =
   let exR = extractCode  res
@@ -203,7 +205,7 @@ debugMode = do
         Nothing -> do
                    -- liftIO $ cPrint  (fst answareFromGPT) Red
                    -- liftIO $ threadDelay 3000000
-                   liftIO $ cPrint  (fst answareFromGPT) Green
+                   liftIO $ cPrint  (trimAns (fst answareFromGPT)) Green
                    liftIO $ threadDelay 2000000 
                    return Nothing
         Just x -> do
@@ -212,7 +214,7 @@ debugMode = do
                   -- liftIO $ setCursorPosition 0 0
                   -- liftIO $ cPrint (fst answareFromGPT) Red
                   -- liftIO $ threadDelay 3000000
-                  liftIO $ cPrint  (fst answareFromGPT) Red
+                  liftIO $ cPrint( trimAns (fst answareFromGPT)) Red
                   -- liftIO $ threadDelay 2000000
 
                   return (Just x)
@@ -282,7 +284,7 @@ debugMode = do
                    liftIO $ clearScreen
                    liftIO $ setCursorPosition 0 0
                    liftIO $ cPrint at_info  Cyan   
-                   liftIO $ cPrint  (fst answareFromGPT) Green
+                   liftIO $ cPrint  (trimAns(fst answareFromGPT)) Green
                    liftIO $ threadDelay 2000000
                    return Nothing
         Just x -> do
@@ -292,7 +294,7 @@ debugMode = do
                   liftIO $ clearScreen
                   liftIO $ setCursorPosition 0 0
                   liftIO $ cPrint at_info  Cyan
-                  liftIO $ cPrint (fst answareFromGPT) Red
+                  liftIO $ cPrint (trimAns (fst answareFromGPT)) Red
                   -- liftIO $ threadDelay 3000000
                   return (Just x)
 
@@ -358,3 +360,5 @@ rmSubS substr str = go str
           | substr `L.isPrefixOf` s = L.drop (L.length substr) s
           | otherwise = x : go xs
 
+trimAns :: String -> String
+trimAns ans = unlines $ take 15 (lines ans) 
