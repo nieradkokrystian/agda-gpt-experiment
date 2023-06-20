@@ -27,9 +27,10 @@ import System.FilePath (splitFileName)
 import System.Directory
 import System.Environment (getEnv)
 
-import Network.HTTP.Client
+import Network.HTTP.Client as NC
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.HTTP.Types.Status
+-- import qualified Network.HTTP.Client.Types as CT
 
 import Control.Concurrent
 
@@ -63,7 +64,7 @@ createGptRequest model prompt key = request
 gptConv ::  String -> [Message] -> String -> OperationMode -> IO (String, String)
 gptConv model prompt key oM= do
   let rprompt = L.reverse (trimPrompt prompt)
-  manager <- newManager tlsManagerSettings
+  manager <- newManager (tlsManagerSettings {managerResponseTimeout = responseTimeoutMicro 90000000 })
   let reqb = createGptRequest model rprompt key
   request <- return (createGptRequest model rprompt key)
   response <- httpLbs reqb manager
@@ -86,9 +87,8 @@ gptConv model prompt key oM= do
     _ -> do
       cPrint ("CODE: " ++ (show code) ++ "\n\n")  Red
       cPrint ( show response ) Red
-      -- putStrLn "--"
-      -- "Something went wrong, try one more time"
-      return ("EMPTY!!!","EMPTY!!!")
+      putStrLn "--"
+      die "Something went wrong, try one more time" 
 
       
 plainCode :: String ->  String
