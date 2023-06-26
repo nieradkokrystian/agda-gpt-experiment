@@ -30,7 +30,7 @@ Common flags:
   -V --version         Print version information
 ```
 
-More details on the website https://codecredence.ai
+More details on the [FormalFoundry website](https://formalfoundry.ai)
 
 
 https://user-images.githubusercontent.com/39689358/230576954-a0403625-da91-4acc-b4ff-a696af9871cf.mp4
