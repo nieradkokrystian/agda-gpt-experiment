@@ -13,7 +13,11 @@ module Main  where
 import Types
 import qualified Gpt as G
 import Extra
+import AgdaApi
 
+import Data.List.Utils
+
+import Data.List
 import System.Console.CmdArgs
 import System.Environment (getArgs)
 import System.Process
@@ -23,100 +27,85 @@ import System.FilePath (splitFileName)
 import System.Directory
 
 import Data.Aeson as A
-import Control.Monad.Trans.RWS 
+import Control.Monad.Trans.RWS
+import Control.Monad.Reader
 
 import Control.Concurrent
+import System.Environment
 
 import System.IO
 
 main :: IO ()
 main = do
-  -- hPutStr stdout "\ESC[?25l"
-  loadConfigAndRun  mainAG
+  loadConfigAndR mainAG
 
 
-
-
-
--- -- set cursor to a processing cursor
--- setProcessingCursor :: IO ()
--- setProcessingCursor = do
---   hPutStr stdout "\ESC[?25l"
-  
---   let spinner = "|/-\\"
-  
---   -- output the spinning wheel characters repeatedly
---   let loop i = do
---         -- move the cursor to the beginning of the line
---         hPutStr stdout "\r"
-        
---         -- output the next spinning wheel character
---         hPutChar stdout (spinner !! (i `mod` length spinner))
-        
---         -- flush the output buffer
---         hFlush stdout
-        
---         -- sleep for a short amount of time
---         threadDelay 100000
-        
---         -- call the loop function recursively with the next index
---         loop (i+1)
-  
---   loop 0
-
-
- 
-loadConfigAndRun :: (AGEnv  -> IO ()) -> IO ()
-loadConfigAndRun mainAG = do
+loadConfigAndR :: (AGEnv  -> IO ()) -> IO ()
+loadConfigAndR  mainAG = do
+  pwd  <- getEnv "PWD"
   args <- cmdArgs readArgs
   fPGpt <- check_promt "f"
   rPGpt <- check_promt "r"
-  agda <- check_agda (agda args)
   conf <- check_config (conF args)
   config  <- (A.decodeFileStrict conf) :: IO (Maybe FromConfig)
-  ts <- timestamp
-  let md = mode args
+  let m = case  mode args of
+                      "Pretty" -> PrettyMode
+                      _        -> DebugMode
   case config of
     Nothing -> do
      cPrint  ("\nConfig file seems to be incorrect check it:  \n" ++ conf)  Red
      putStrLn "--"
      die "Something went wrong, try one more time"
-    Just c ->
-             let
-             (path, file) =  splitFileName agda  
-             newAF = "AGA-"++ file 
-             pureF = take (length file - 5 )file
-             dirN = pureF ++"_"++ts
-             m = case md of
-                      "Pretty" -> PrettyMode
-                      _        -> DebugMode
-                 
-             env = AGEnv
-               { apiKey = gptApiKey c
-               , orgAgdaF = agda
-               , dirName = dirN
-               , agdaFile = newAF
-               , taskDescription = (task args)
-               , operationMode = m
-               , maxTurns = maxT args
-               , fGptTemp = fPGpt
-               , rGptTemp = rPGpt
-               , gptModel =  gpt_model c
-               }
-            in mainAG env
-             
+    Just c -> do
+      problemlist <- runReaderT buildProblemList (args, (problemsDir c))
+      writeFile (pwd++"/aga-log.txt") ( "Aga has  " ++ (show (length problemlist)))
+      let mainDir = pwd ++ "/aga-exec"
+      createDirectory $ mainDir
+      mapM_ (cAGE mainDir) problemlist
+      where
+         cAGE dir problem = do
+           setCurrentDirectory dir
+           let name = case stripPrefix (problemsDir c ++ "Problems/") (nameP problem) of
+                 Nothing -> "unknow_dir"
+                 Just x -> x
+               nameOfProblemDir = replace "/" "-" (take (length name - 5 )name)
+               dirN = dir ++ "/"  ++ nameOfProblemDir
+               newAF = "AGA-" ++ "Problem.agda"
+           createDirectory dirN
+           setCurrentDirectory dirN
+           writeFile (dirN++"/Problem.agda") (agdaP problem)
+           copyFile (metaP problem) (dirN++"/Problem.json")
+           copyFile "Problem.agda" "Org-Problem.agda"
+
+           let  env = AGEnv
+                 { apiKey = gptApiKey c
+                 , orgAgdaF = dirN ++ "/Org-Problem.agda"
+                 , dirName = dirN
+                 , agdaFile = dirN ++ "/Problem.agda"
+                 , taskDescription = taskP problem
+                 , fullTask = fulltP problem
+                 , operationMode = m
+                 , maxTurns = maxT args
+                 , fGptTemp = fPGpt
+                 , rGptTemp = rPGpt
+                 , gptModel =  gpt_model c
+                 , tc_url = typeCheckerURL c
+                 , tc_key = typeCheckerKEY c
+                 , meta_l = (dirN ++ "/Problem.json")
+                 }
+           mainAG env
+
+
+
 
 mainAG :: AGEnv -> IO ()
 mainAG env = do
-  checkAgdaF <- G.tryToCompile $  (orgAgdaF env)
+  checkAgdaF <- tryToCompileAPI   (agdaFile env) (meta_l env) (tc_url env)
   case checkAgdaF of
     Just x -> do
-       cPrint  ("Incorrect  agda File:  " ++ (orgAgdaF env) ++ "\n\n" ++ "COMPILER ERROR: " ++ x ) Red 
+       cPrint  ("Incorrect  agda File:  " ++ (orgAgdaF env) ++ "\n\n" ++ "COMPILER ERROR: " ++ x ) Red
     Nothing -> do
                initInfo env
-               threadDelay 1500000
-               copyFile (orgAgdaF env) ((agdaFile env))
-               createDirectory (dirName env)
                conversation env []
 
 
@@ -125,29 +114,28 @@ conversation env cP = do
   (mValue, state, _ ) <- runRWST G.debugMode env cP
   let l = length state
   case mValue of
-    Just x -> 
+    Just x ->
       if l  < (maxTurns env)
       then
         do
           conversation env state
         else do
         cPrint "Too many attempts, Agda-GPT-Assistan fail. Increase max turn or change agda task for GPT. \n Check logs files." Red
-            
     Nothing ->do
       setSGR [(SetColor Foreground Dull Green)]
       clearScreen
       setCursorPosition 0 0
-      putStrLn $ "Compilation succeeded in " ++ (show l) ++ " attempts. Check new "++ (agdaFile env) ++ " file\n\n" ++
-        "Here is the code you need to add to your existing code:\n" ++
-        (gpt_res (head state)) ++ "\n\nHere is the complite agda file code: \n\n" ++
-        (current_agad_file (head state))
-         
+      putStrLn $ "Compilation succeeded in " ++ (show l) ++ " attempts."
+
+      setSGR [Reset]
+      putStrLn $ (gpt_res (head state))
+      threadDelay 2000000
       setSGR [Reset]
 
 initInfo :: AGEnv ->  IO ()
 initInfo env = do
   clearScreen
-  setCursorPosition 0 0 
+  setCursorPosition 0 0
   setSGR [(SetColor Foreground Dull Blue)]
   putStrLn "\n\n\n###############################################"
   putStrLn "Agda-GPT-Assistant started with the following flags:\n\n"
@@ -156,5 +144,4 @@ initInfo env = do
   putStrLn $ "MODE:  " ++ (show (operationMode env)) ++ "\n\n"
   putStrLn $ "MAX TURN :  " ++ (show (maxTurns env)) ++ "\n\n"
   putStrLn $ "MODEL:  " ++ (gptModel env) ++ "\n\n"
-  
 

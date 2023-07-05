@@ -9,7 +9,7 @@ module Gpt where
 
 import Types
 import Extra
-
+import AgdaApi
 
 import Control.Monad.Trans.RWS
 import Control.Monad.IO.Class (liftIO)
@@ -27,9 +27,10 @@ import System.FilePath (splitFileName)
 import System.Directory
 import System.Environment (getEnv)
 
-import Network.HTTP.Client
+import Network.HTTP.Client as NC
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.HTTP.Types.Status
+-- import qualified Network.HTTP.Client.Types as CT
 
 import Control.Concurrent
 
@@ -48,7 +49,7 @@ genJsonReq model messages =
 createGptRequest :: String -> [Message] -> String -> Request
 createGptRequest model prompt key = request
   where
-    apiKey_ = B.pack key 
+    apiKey_ = B.pack key
     baseRequest = parseRequest_ "https://api.openai.com/v1/chat/completions"
     request = baseRequest
       { method = "POST"
@@ -62,8 +63,8 @@ createGptRequest model prompt key = request
 
 gptConv ::  String -> [Message] -> String -> OperationMode -> IO (String, String)
 gptConv model prompt key oM= do
-  let rprompt = L.reverse (trimPrompt prompt) 
-  manager <- newManager tlsManagerSettings
+  let rprompt = L.reverse (trimPrompt prompt)
+  manager <- newManager (tlsManagerSettings {managerResponseTimeout = responseTimeoutMicro 90000000 })
   let reqb = createGptRequest model rprompt key
   request <- return (createGptRequest model rprompt key)
   response <- httpLbs reqb manager
@@ -78,7 +79,7 @@ gptConv model prompt key oM= do
         DebugMode -> do
           setSGR [(SetColor Foreground Dull Yellow)]
           putStrLn $ "\n\n\n" ++ show reqb ++ "\n\n\n\n\n"
-          putStrLn $ show $ genJsonReq model rprompt      
+          putStrLn $ show $ genJsonReq model rprompt
           putStrLn $ show $  response
           setSGR [Reset]
       return $  (plainCode  (decodeRes $ responseBody response),
@@ -89,12 +90,13 @@ gptConv model prompt key oM= do
       putStrLn "--"
       die "Something went wrong, try one more time" 
 
+      
 plainCode :: String ->  String
 plainCode res =
   let exR = extractCode  res
   in
   case exR of
-    [] -> "EMPTY!!!" --  change into Maybe String 
+    [] -> "EMPTY!!!" --  change into Maybe String
     _ -> rmSubS "Agda" (rmSubS "agda" (L.concat $ exR))
 
 
@@ -110,41 +112,18 @@ extractCode str = extractCodeBlocks' str []
         takeCodeBlock xs = if L.take 3 xs == "```"
                            then let (block, rest) = L.span (/= '`') (L.drop 3 xs)
                                 in Just (block, L.drop 3 rest)
-                           else Nothing 
+                           else Nothing
 
-
-
-tryToCompile :: String -> IO (Maybe String)
-tryToCompile fp = do
-  let (path, file) =  splitFileName fp
-  aReq <- runProcess_ path file
-  p  <- getEnv "PWD"
-  case aReq of
-    Nothing -> return Nothing
-    Just re -> do
-                return $ Just $ replaceStringLoop (p++"/") "" re
-      
-runProcess_ ::  FilePath -> String -> IO (Maybe String)
-runProcess_ pwd afile = do
-  let cp = shell $ "agda" ++ " " ++ afile
-      ncp = cp { cwd = Just pwd
-               , std_out = CreatePipe
-               , std_err = CreatePipe
-               }            
-  (code, output, errorOutput) <- readCreateProcessWithExitCode ncp ""
-  let result = case code of
-                  ExitSuccess   -> Nothing
-                  ExitFailure _ -> Just output
-  return result
-  
--- -----------------------------------------------
 
 debugMode :: AGMonad (Maybe String)
 debugMode = do
   env <- ask
   state <- get
+  x <- liftIO $ getCurrentDirectory
   let model = gptModel env
       key = apiKey env
+      task = taskDescription env
+      full = fullTask env
       mode = operationMode env
       dir = dirName env
       sl = L.length state
@@ -153,28 +132,25 @@ debugMode = do
       gA_log = (dir++"/all_gpt.log")
       gC_log = (dir++"/code_gpt.log")
       only_code = ("state_code_gpt.log")
-      r = "\n\nREASPONSE:  \n\n"
-      p = "\n\nPROMPT:  \n\n"
-      at_info = "\n ############## Attempt number:  " ++ show (sl+1) ++ "  ##############\n\n"
+      r = "\n\nREASPONSE: \n"
+      p = "\n\nPROMPT: \n"
+      at_info = "############## Attempt number:  " ++ show (sl+1) ++ "  ##############"
       firstPrompt = Message {role = "system", content = "You are a helpful assistant."}
-  case mode of
-    PrettyMode -> do
-      return ()
-    DebugMode -> do
-      liftIO $ return ()
+  -- case mode of
+  --   PrettyMode -> do
+  --     return ()
+  --   DebugMode -> do
+  --     liftIO $ return ()
 
 
-  -- liftIO $ clearScreen
-  -- liftIO $ setCursorPosition 0 0
-  -- liftIO $ cPrint at_info  Cyan 
-      
   if sl == 0
   then
     do
       liftIO $ clearScreen
       liftIO $ setCursorPosition 0 0
-      liftIO $ cPrint at_info  Cyan 
-      
+      liftIO $ cPrint ("###############  Initial problem  ###############\n") Cyan
+      liftIO $ putStrLn $  full
+
       contentAfile <- liftIO $ readFile agdafile
       liftIO $ appendFile a_log  "#########################  Initial data  #########################\n\n"
       liftIO $ appendFile a_log  contentAfile
@@ -192,27 +168,30 @@ debugMode = do
       let promptRes = Message {role = "assistant" , content = (snd answareFromGPT)}
       -- liftIO $ threadDelay 1000000
       -- liftIO $ clearScreen
-      -- liftIO $ setCursorPosition 0 0     
-      liftIO $ cPrint "The following reasponse was received from GPT:\n\n" Yellow
+      -- liftIO $ setCursorPosition 0 0
+      liftIO $ clearScreen
+      liftIO $ setCursorPosition 0 0
+      liftIO $ cPrint at_info  Cyan
+      -- liftIO $ cPrint "The following reasponse was received from GPT:" Yellow
       liftIO $ appendFile agdafile (fst answareFromGPT)
       newAfile <- liftIO $ readFile agdafile
       liftIO  $ writeFile only_code  at_info
       liftIO $ appendFile only_code (fst answareFromGPT)
       liftIO  $ appendFile a_log  at_info
-      liftIO $ appendFile a_log ("\n\n" ++newAfile)     
-      case mode of
-        DebugMode -> do
-          liftIO $ putStrLn $ snd answareFromGPT ++ "\n\n"
-          liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
-          liftIO $ putStrLn "Code Only"
-          liftIO $ setSGR [Reset]
-          liftIO $ putStrLn $ fst answareFromGPT ++ "\n\n"
+      liftIO $ appendFile a_log ("\n\n" ++newAfile)
+      -- case mode of
+      --   DebugMode -> do
+      --     liftIO $ putStrLn $ snd answareFromGPT ++ "\n\n"
+      --     liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
+      --     liftIO $ putStrLn "Code Only"
+      --     liftIO $ setSGR [Reset]
+      
+      --   PrettyMode -> do
 
-        PrettyMode -> do  
-          liftIO $ putStrLn $ fst answareFromGPT ++ "\n\n"
-          
+      --     liftIO $ putStrLn $ fst answareFromGPT ++ "\n"
+      --     liftIO $ threadDelay 1000000
 
-      compiler <- liftIO $ tryToCompile agdafile
+      compiler <- liftIO $ tryToCompileAPI agdafile (meta_l env) (tc_url env)
       let newState = (createConvPart fcon answareFromGPT newAfile compiler [ promptRes, promptReq, firstPrompt]  : state)
 
       put newState
@@ -224,13 +203,20 @@ debugMode = do
 
       case compiler of
         Nothing -> do
+                   -- liftIO $ cPrint  (fst answareFromGPT) Red
+                   -- liftIO $ threadDelay 3000000
+                   liftIO $ cPrint  (trimAns (fst answareFromGPT)) Green
+                   liftIO $ threadDelay 2000000 
                    return Nothing
         Just x -> do
                   -- liftIO $ threadDelay 3000000
                   -- liftIO $ clearScreen
                   -- liftIO $ setCursorPosition 0 0
-                  liftIO $ cPrint ("The agda compiler response with the following errors\n\n" ++ x) Red
-                  -- liftIO $ threadDelay 3000000 
+                  -- liftIO $ cPrint (fst answareFromGPT) Red
+                  -- liftIO $ threadDelay 3000000
+                  liftIO $ cPrint( trimAns (fst answareFromGPT)) Red
+                  -- liftIO $ threadDelay 2000000
+
                   return (Just x)
 
 -- __________ >0
@@ -258,51 +244,58 @@ debugMode = do
       -- liftIO $ clearScreen
       -- liftIO $ setCursorPosition 0 0
 
-      liftIO $ clearScreen
-      liftIO $ setCursorPosition 0 0
-      liftIO $ cPrint at_info  Cyan 
+ 
       
-      liftIO $ cPrint "The following reasponse was received from GPT:\n\n" Yellow 
-      case mode of
-        DebugMode -> do
-          liftIO $ putStrLn $ snd answareFromGPT ++ "\n\n"
-          liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
-          liftIO $ putStrLn "Code Only"
-          liftIO $ setSGR [Reset]
-          liftIO $ putStrLn $ fst answareFromGPT ++ "\n\n"
+      -- liftIO $ cPrint "The following reasponse was received from GPT:\n\n" Yellow 
+      -- case mode of
+      --   DebugMode -> do
+      --     liftIO $ putStrLn $ snd answareFromGPT ++ "\n\n"
+      --     liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
+      --     liftIO $ putStrLn "Code Only"
+      --     liftIO $ setSGR [Reset]
+      --     liftIO $ putStrLn $ fst answareFromGPT ++ "\n\n"
 
-        PrettyMode -> do  
-          liftIO $ putStrLn $ fst answareFromGPT ++ "\n\n"
-      case (fst answareFromGPT) of
-        "EMPTY!!!" -> do
-           liftIO $ cPrint "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" Red 
-           liftIO $ putStrLn "ChatGPT hasn't responsed with any code"
-        _ -> do 
-          -- liftIO $ rmAFile env
-          liftIO $ removeFile agdafile
-          liftIO $ copyFile (orgAgdaF env) (agdaFile env)
-          liftIO $ appendFile agdafile (fst answareFromGPT)
-         
+      --   PrettyMode -> do
+      --     liftIO $ putStrLn $ fst answareFromGPT ++ "\n\n"
+      -- case (fst answareFromGPT) of
+      --   "EMPTY!!!" -> do
+      --      liftIO $ cPrint "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" Red
+      --      liftIO $ putStrLn "ChatGPT hasn't responsed with any code"
+      --   _ -> do
+      --     -- liftIO $ rmAFile env
+      --     liftIO $ removeFile agdafile
+      --     liftIO $ copyFile (orgAgdaF env) (agdaFile env)
+      --     liftIO $ appendFile agdafile (fst answareFromGPT)
+
 
       newAfile <- liftIO $ readFile agdafile
-      compiler <- liftIO $ tryToCompile agdafile
+      compiler <- liftIO $ tryToCompileAPI agdafile (meta_l env) (tc_url env)
       liftIO  $ appendFile a_log  at_info
       liftIO $ appendFile a_log newAfile
       -- liftIO $ threadDelay 3000000
       -- liftIO $ clearScreen
       -- liftIO $ setCursorPosition 0 0
       -- liftIO $ cPrint "New agda file, with GTP answare \n\n" Magenta
-      -- liftIO $ putStrLn newAfile  
+      -- liftIO $ putStrLn newAfile
       let newState = (createConvPart rcon answareFromGPT newAfile compiler (rPromptRes:rPromptReq:sPrompt)  : state)
       put newState
       case compiler of
         Nothing -> do
+                   liftIO $ clearScreen
+                   liftIO $ setCursorPosition 0 0
+                   liftIO $ cPrint at_info  Cyan   
+                   liftIO $ cPrint  (trimAns(fst answareFromGPT)) Green
+                   liftIO $ threadDelay 2000000
                    return Nothing
         Just x -> do
                   -- liftIO $ threadDelay 3000000
                   -- liftIO $ clearScreen
                   -- liftIO $ setCursorPosition 0 0
-                  liftIO $ cPrint ("The agda compiler response with the following errors\n\n" ++ x) Red
+                  liftIO $ clearScreen
+                  liftIO $ setCursorPosition 0 0
+                  liftIO $ cPrint at_info  Cyan
+                  liftIO $ cPrint (trimAns (fst answareFromGPT)) Red
+                  -- liftIO $ threadDelay 3000000
                   return (Just x)
 
 
@@ -317,12 +310,12 @@ createConvPart gptIn gptOut afile acres fp =
           , current_agad_file =  afile
           , agda_res = acres
           , promptL = fp
-          } 
+          }
 
 fConvInput :: AGEnv -> IO String
 fConvInput env = do
     templ <- readFile $ fGptTemp env
-    agda <- readFile $  (agdaFile env) 
+    agda <- readFile $  (agdaFile env)
     let x1 = replaceText templ "{function_type}" (taskDescription env)
     let x2 = replaceText x1 "{agda_code}" agda
     return x2
@@ -334,8 +327,8 @@ rConvInput cf env err = do
     let x1 = replaceText templ "{agda_code_with_changes}" cf
     let x2 = replaceText x1 "{compiler_errors}"  err
     return x2
-  
-  
+
+
 replaceText :: String -> String -> String -> String
 replaceText [] _ _ = []
 replaceText str search replace
@@ -367,3 +360,5 @@ rmSubS substr str = go str
           | substr `L.isPrefixOf` s = L.drop (L.length substr) s
           | otherwise = x : go xs
 
+trimAns :: String -> String
+trimAns ans = unlines $ take 15 (lines ans) 

@@ -21,3 +21,16 @@ cabal.project.local
 cabal.project.local~
 .HTF/
 .ghc.environment.*
+
+
+
+*.agdai
+# -*- mode: gitignore; -*-
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*

@@ -11,6 +11,9 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 
 import Control.Monad.Trans.RWS 
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Reader as MR
+import Control.Monad as MM
+
 import Data.Maybe
 
 import  Types
@@ -32,15 +35,13 @@ import Data.Time.Format
 
 import System.Console.ANSI
 
-
-import Data.List.Split 
-
+import qualified Data.String as S 
 
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Data.Text as T
 import System.Exit
-import System.FilePath (splitFileName)
+import System.FilePath 
 
 import Control.Concurrent
 
@@ -50,15 +51,6 @@ cPrint s c = do
   putStrLn s
   setSGR [Reset]
 
-
--- cPrint :: String -> Color -> IO ()
--- cPrint s c = do
---   setSGR [(SetColor Foreground Dull c )]
---   clearScreen
---   threadDelay 7000000 -- microSec
---   setCursorPosition 0 0 
---   putStrLn s
---   setSGR [Reset]
 
 
 check_promt :: String ->  IO String
@@ -118,6 +110,105 @@ trimPrompt ml =
   else
     let (p1:p2:x)= ml in
       p1 : p2 : (L.drop (l - 10) ml)
-    
-    
+
+
+
+buildProblemList :: PLMonad [Problem]
+buildProblemList = do
+  fromReader <- MR.ask
+  let dirP = snd fromReader
+      inputP = input (fst fromReader)
+      sourceP = source (fst fromReader)
+  case inputP of
+    "problem" -> do
+      problem <-  liftIO $ extractProblem (dirP ++ sourceP ++ ".agda")
+      return [problem]
+    "dir" -> do
+      problemsAL <- liftIO $ dirInspection  (dirP  ++ sourceP ++ "/") []
+      problems <- liftIO $ mapM  extractProblem problemsAL
+      return problems
+    "list" -> do
+      l <- liftIO $ decodeList sourceP
+      let newl  = fmap (\x -> dirP ++ x) l
+      x <- liftIO $ mapM extractProblem newl
+      return x
+    _ ->  do liftIO $ do
+                        cPrint ("Type proper input value\n") Red
+                        putStrLn "--"
+                        die "Something went wrong, try one more time"
+
+
+type  LString = [String]
+
+dirInspection :: String ->  LString ->IO [String]
+dirInspection dir list= do
+  c <-listDirectory $ dir
+  let newDir = fmap (\x -> dir ++ x) $ L.sort c
+  let flist = L.foldl funcA list newDir
+  dlist <-funcB  newDir (list)
+  return $ dlist ++ flist
+  where
+
+    funcA acc l = case  takeExtension l of
+      ".agda" -> l : (acc :: [String])
+      _ -> acc
+
+funcB :: LString -> LString -> IO LString
+funcB dirs lstring = do
+
+  neL <-  MM.foldM funcC lstring dirs
+  return neL
+  where
+    funcC acc ll = do
+      ex <- doesDirectoryExist ll
+      case ex of
+        True -> dirInspection (ll++ "/") acc
+        False -> return acc
+
+decodeList :: String -> IO [String]
+decodeList name  =  do
+  pwd <- getEnv "PWD"
+  ls <- (A.decodeFileStrict (pwd ++ "/" ++ name)) :: IO ( Maybe [String])
+  case ls of
+    Nothing -> do
+               cPrint ("Incorect problem list ") Red
+               putStrLn "--"
+               die "Something went wrong, try one more time"
+    Just list -> return list
+
+
+
+extractProblem :: String -> IO Problem
+extractProblem fp = do
+  pFile <- check_agda fp
+  readedAFile <- liftIO $ readFile pFile
+  let (task, agda, full) = splitProblem readedAFile
+  meta <- findMetaD fp
+  return $ Problem agda task meta fp full
+
+
+
+findMetaD :: String -> IO FilePath
+findMetaD fp = do
+  let (path, file) =  splitFileName fp
+  e <- doesFileExist $ replaceExtension fp "json"
+  case e of
+    True -> return fp
+    False -> findMetaF path
+
+findMetaF :: FilePath -> IO FilePath
+findMetaF path = do
+  let filePath = path ++ "Meta.json"
+  m <- doesFileExist $ filePath
+  case m of
+    True -> return filePath
+    False -> do
+      findMetaF  $ (( takeDirectory .  takeDirectory) path) ++ "/"
+
+
+splitProblem :: String -> (String, String, String)
+splitProblem file =
+  let list@(x:z:r) =( L.reverse . S.lines) file in
+  (z,((S.unlines . L.reverse) r), (z ++ "\n" ++ x))
+
 
