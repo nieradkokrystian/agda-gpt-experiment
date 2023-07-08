@@ -50,6 +50,7 @@ library
     , mtl
     , process
     , regex-posix
+    , scheduler
     , scotty
     , split
     , text
@@ -81,6 +82,7 @@ executable aga
     , mtl
     , process
     , regex-posix
+    , scheduler
     , scotty
     , split
     , text
@@ -113,6 +115,7 @@ test-suite agda-gpt-experiment-test
     , mtl
     , process
     , regex-posix
+    , scheduler
     , scotty
     , split
     , text

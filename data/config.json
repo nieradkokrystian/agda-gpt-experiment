@@ -3,6 +3,7 @@
   "gpt_model" : "gpt-3.5-turbo",
   "tChecker_url" : "http://localhost:3030/agda",
   "tChecker_key" : "not_yet_impelemnted",
-  "problems_dir" : "~/......"
+  "problems_dir" : "~/......",
+  "threads" : 3
 
 }

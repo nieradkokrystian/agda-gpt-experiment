@@ -15,7 +15,11 @@ import qualified Gpt as G
 import Extra
 import AgdaApi
 
+import Control.Scheduler
+import Control.Concurrent
+
 import Data.List.Utils
+import Data.Word (Word16)
 
 import Data.List
 import System.Console.CmdArgs
@@ -40,7 +44,7 @@ main = do
   loadConfigAndR mainAG
 
 
-loadConfigAndR :: (AGEnv  -> IO ()) -> IO ()
+loadConfigAndR :: (AGEnv  -> String -> IO ()) -> IO ()
 loadConfigAndR  mainAG = do
   pwd  <- getEnv "PWD"
   args <- cmdArgs readArgs
@@ -58,10 +62,11 @@ loadConfigAndR  mainAG = do
      die "Something went wrong, try one more time"
     Just c -> do
       problemlist <- runReaderT buildProblemList (args, (problemsDir c))
-      writeFile (pwd++"/aga-log.txt") ( "Aga has  " ++ (show (length problemlist)))
+      writeFile (pwd++"/aga-log.txt") ( "Aga had  " ++ (show (length problemlist))++ " problems to solved\n\n")
       let mainDir = pwd ++ "/aga-exec"
+          w16 = intToWord16 (threadsNumbers c) 
       createDirectory $ mainDir
-      mapM_ (cAGE mainDir) problemlist
+      traverseConcurrently_ (ParN w16) (cAGE mainDir) problemlist
       where
          cAGE dir problem = do
            setCurrentDirectory dir
@@ -74,7 +79,9 @@ loadConfigAndR  mainAG = do
            createDirectory dirN
            setCurrentDirectory dirN
            writeFile (dirN++"/Problem.agda") (agdaP problem)
+           threadDelay 12453
            copyFile (metaP problem) (dirN++"/Problem.json")
+           threadDelay 12453
            copyFile "Problem.agda" "Org-Problem.agda"
 
            let  env = AGEnv
@@ -93,24 +100,24 @@ loadConfigAndR  mainAG = do
                  , tc_key = typeCheckerKEY c
                  , meta_l = (dirN ++ "/Problem.json")
                  }
-           mainAG env
+           mainAG env pwd
 
 
 
 
-mainAG :: AGEnv -> IO ()
-mainAG env = do
+mainAG :: AGEnv -> String -> IO ()
+mainAG env pwd = do
   checkAgdaF <- tryToCompileAPI   (agdaFile env) (meta_l env) (tc_url env)
   case checkAgdaF of
     Just x -> do
        cPrint  ("Incorrect  agda File:  " ++ (orgAgdaF env) ++ "\n\n" ++ "COMPILER ERROR: " ++ x ) Red
     Nothing -> do
                initInfo env
-               conversation env []
+               conversation env [] pwd
 
 
-conversation :: AGEnv -> [ConvPart] -> IO ()
-conversation env cP = do
+conversation :: AGEnv -> [ConvPart] -> String -> IO ()
+conversation env cP pwd = do
   (mValue, state, _ ) <- runRWST G.debugMode env cP
   let l = length state
   case mValue of
@@ -118,15 +125,16 @@ conversation env cP = do
       if l  < (maxTurns env)
       then
         do
-          conversation env state
+          conversation env state pwd
         else do
         cPrint "Too many attempts, Agda-GPT-Assistan fail. Increase max turn or change agda task for GPT. \n Check logs files." Red
+        appendFile (pwd++"/aga-log.txt") ("\n FAILED " ++ " " ++ (dirName env))
     Nothing ->do
       setSGR [(SetColor Foreground Dull Green)]
       clearScreen
       setCursorPosition 0 0
       putStrLn $ "Compilation succeeded in " ++ (show l) ++ " attempts."
-
+      appendFile (pwd++"/aga-log.txt") ("\n OK " ++ (show l) ++ "    " ++ (dirName env))
       setSGR [Reset]
       putStrLn $ (gpt_res (head state))
       threadDelay 2000000
@@ -145,3 +153,6 @@ initInfo env = do
   putStrLn $ "MAX TURN :  " ++ (show (maxTurns env)) ++ "\n\n"
   putStrLn $ "MODEL:  " ++ (gptModel env) ++ "\n\n"
 
+
+intToWord16 :: Int -> Word16
+intToWord16 n = fromIntegral (n `mod` fromIntegral (maxBound :: Word16))

@@ -64,7 +64,7 @@ createGptRequest model prompt key = request
 gptConv ::  String -> [Message] -> String -> OperationMode -> IO (String, String)
 gptConv model prompt key oM= do
   let rprompt = L.reverse (trimPrompt prompt)
-  manager <- newManager (tlsManagerSettings {managerResponseTimeout = responseTimeoutMicro 90000000 })
+  manager <- newManager (tlsManagerSettings {managerResponseTimeout = responseTimeoutMicro 120000000 })
   let reqb = createGptRequest model rprompt key
   request <- return (createGptRequest model rprompt key)
   response <- httpLbs reqb manager
@@ -134,7 +134,7 @@ debugMode = do
       only_code = ("state_code_gpt.log")
       r = "\n\nREASPONSE: \n"
       p = "\n\nPROMPT: \n"
-      at_info = "############## Attempt number:  " ++ show (sl+1) ++ "  ##############"
+      at_info = "############## Attempt number:  " ++ show (sl+1) ++ " ##############"
       firstPrompt = Message {role = "system", content = "You are a helpful assistant."}
   -- case mode of
   --   PrettyMode -> do
@@ -163,7 +163,7 @@ debugMode = do
       let promptReq = Message {role = "user", content = fcon}
       answareFromGPT <- liftIO $ gptConv model [promptReq, firstPrompt] key mode
       liftIO $ appendFile gC_log  (r++(fst answareFromGPT))
-      liftIO $ writeFile only_code (fst answareFromGPT)
+      -- liftIO $ writeFile only_code (fst answareFromGPT)
       liftIO $ appendFile gA_log  (r++(snd answareFromGPT))
       let promptRes = Message {role = "assistant" , content = (snd answareFromGPT)}
       -- liftIO $ threadDelay 1000000
@@ -175,8 +175,8 @@ debugMode = do
       -- liftIO $ cPrint "The following reasponse was received from GPT:" Yellow
       liftIO $ appendFile agdafile (fst answareFromGPT)
       newAfile <- liftIO $ readFile agdafile
-      liftIO  $ writeFile only_code  at_info
-      liftIO $ appendFile only_code (fst answareFromGPT)
+      -- liftIO  $ writeFile only_code  at_info
+      -- liftIO $ appendFile only_code (fst answareFromGPT)
       liftIO  $ appendFile a_log  at_info
       liftIO $ appendFile a_log ("\n\n" ++newAfile)
       -- case mode of
@@ -237,8 +237,8 @@ debugMode = do
       liftIO $ appendFile gA_log (r ++ (snd answareFromGPT))
       liftIO $ appendFile gC_log  ("\n\n"++ at_info)
       liftIO $ appendFile gC_log  (r++(fst answareFromGPT))
-      liftIO  $ writeFile only_code  at_info
-      liftIO $ appendFile only_code (fst answareFromGPT)
+      -- liftIO  $ writeFile only_code  at_info
+      -- liftIO $ appendFile only_code (fst answareFromGPT)
       let rPromptRes = Message {role = "assistant", content = (snd answareFromGPT)}
       -- liftIO $ threadDelay 1000000
       -- liftIO $ clearScreen
@@ -361,4 +361,4 @@ rmSubS substr str = go str
           | otherwise = x : go xs
 
 trimAns :: String -> String
-trimAns ans = unlines $ take 15 (lines ans) 
+trimAns ans = unlines $ take 12 (lines ans) 

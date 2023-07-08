@@ -106,10 +106,10 @@ timestamp = do
 trimPrompt :: [Message] -> [Message]
 trimPrompt ml =
   let l = L.length ml in 
-  if (L.length ml) <= 16 then ml
+  if (L.length ml) <= 10 then ml
   else
     let (p1:p2:x)= ml in
-      p1 : p2 : (L.drop (l - 10) ml)
+      p1 : p2 : (L.drop (l - 6) ml)
 
 
 

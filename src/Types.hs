@@ -132,6 +132,7 @@ data FromConfig = FromConfig
   , typeCheckerURL :: String
   , typeCheckerKEY :: String
   , problemsDir :: String
+  , threadsNumbers :: Int
   } deriving (Show)
 
 instance FromJSON FromConfig where
@@ -141,6 +142,7 @@ instance FromJSON FromConfig where
     <*> v .: "tChecker_url"
     <*> v .: "tChecker_key"
     <*> v .: "problems_dir"
+    <*> v .: "threads"
 
 
 
